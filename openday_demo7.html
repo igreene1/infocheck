@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfoCheck - Threat Intelligence Platform</title>
+    <style>
+        /* === GLOBAL & CRT EFFECTS === */
+        body { margin: 0; font-family: 'Courier New', Courier, monospace; background-color: #050505; color: #e0e0e0; overflow-x: hidden; user-select: none; }
+        * { box-sizing: border-box; }
+        .hidden { display: none !important; }
+        button { cursor: pointer; transition: all 0.2s; font-family: 'Courier New', Courier, monospace; }
+        button:hover { filter: brightness(1.2); }
+        button:active { transform: translateY(2px); }
+        
+        body::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); z-index: 2; pointer-events: none; }
+        .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 8px; background: rgba(46, 204, 113, 0.3); box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); animation: scan-down 6s linear infinite; pointer-events: none; z-index: 3; }
+        @keyframes scan-down { 0% { top: -10%; } 100% { top: 110%; } }
+
+        /* === START SCREEN & PORTAL === */
+        .portal-container { position: relative; z-index: 10; max-width: 600px; margin: 15vh auto 0 auto; background: rgba(10, 15, 20, 0.9); border: 1px solid #1a2530; border-top: 3px solid #00a8ff; padding: 50px 40px; text-align: center; box-shadow: 0 0 40px rgba(0, 168, 255, 0.15); }
+        .portal-btn { background: rgba(0, 168, 255, 0.1); border: 1px solid #00a8ff; color: #00a8ff; padding: 18px 30px; width: 100%; font-size: 16px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; cursor: pointer; }
+        .portal-btn:hover { background: #00a8ff; color: #000; box-shadow: 0 0 15px rgba(0, 168, 255, 0.4); }
+        .portal-btn.secondary { background: transparent; border: 1px solid #444; color: #888; }
+        .portal-btn.secondary:hover { border-color: #aaa; color: #fff; background: rgba(255,255,255,0.05); }
+
+        /* === NAVBAR === */
+        .system-nav { background: #111; border-bottom: 2px solid #00a8ff; display: flex; justify-content: center; padding: 0 20px; position: sticky; top: 0; z-index: 100; }
+        .nav-btn { background: transparent; color: #888; border: none; padding: 15px 20px; font-weight: bold; font-size: 14px; position: relative; border-bottom: 3px solid transparent; }
+        .nav-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
+        .nav-btn.active { color: #00a8ff; border-bottom: 3px solid #00a8ff; background: rgba(0, 168, 255, 0.1); }
+        .notification-dot { position: absolute; top: 10px; right: 10px; height: 10px; width: 10px; background-color: #c0392b; border-radius: 50%; box-shadow: 0 0 8px #c0392b; display: none; }
+
+        /* === CORE UI === */
+        .app-container { max-width: 800px; margin: 20px auto; position: relative; z-index: 10; padding-bottom: 50px; }
+        .terminal-box { background-color: #111; border: 1px solid #333; margin-bottom: 20px; box-shadow: 0px 5px 20px rgba(0,0,0,0.6); animation: fade-up 0.3s ease-out; }
+        .header-bar { padding: 12px 15px; font-weight: bold; display: flex; justify-content: space-between; font-size: 13px; color: #fff; background: #1a1a1a; border-bottom: 1px solid #333; }
+        .content-pad { padding: 30px; }
+        @keyframes fade-up { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
+
+        .btn-action { border: none; padding: 18px; font-weight: bold; text-transform: uppercase; font-size: 14px; color: #fff; width: 100%; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+        .stats-bar { background: #151515; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; margin-bottom: 20px; }
+        .rep-bar-container { background: #000; height: 12px; width: 220px; display: inline-block; vertical-align: middle; margin: 0 15px; border: 1px solid #444; }
+        .rep-bar-fill { background: linear-gradient(90deg, #c0392b 0%, #f1c40f 50%, #2ecc71 100%); height: 100%; transition: width 1s ease-in-out; }
+
+        .social-card { background: #fff; color: #222; border-radius: 4px; padding: 15px; border-left: 5px solid #c0392b; font-family: Arial, sans-serif; }
+        .evidence-btn { background: #151515; border: 1px solid #333; border-left: 3px solid #00a8ff; color: #00a8ff; padding: 15px 20px; width: 100%; text-align: left; margin-bottom: 12px; display: flex; justify-content: space-between; font-weight: bold;}
+        .evidence-btn.viewed { border-left-color: #444; color: #666; pointer-events: none; }
+        .decoding-text { font-family: monospace; color: #2ecc71; word-break: break-all; line-height: 1.5; }
+
+        /* === VIEWS === */
+        .email-item { background: #1a1a1a; border-left: 3px solid #555; padding: 15px; margin-bottom: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .email-item.unread { border-left-color: #00a8ff; background: #1a2530; }
+        .email-body { background: #0a0a0a; padding: 20px; border: 1px dashed #444; margin-top: 10px; font-family: Arial, sans-serif; line-height: 1.5; color: #ccc; }
+
+        .lb-row { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #222; font-size: 15px; align-items: center; }
+        .lb-row.rival { color: #f1c40f; font-weight: bold; background: rgba(241, 196, 15, 0.1); border-left: 3px solid #f1c40f; }
+        .lb-row.player { color: #2ecc71; font-weight: bold; background: rgba(46, 204, 113, 0.1); border-left: 3px solid #2ecc71; }
+
+        /* === GOLD MEDALS === */
+        .medal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .medal-card { background: #111; border: 1px solid #333; padding: 20px; text-align: center; color: #555; transition: all 0.5s; position: relative; overflow: hidden; }
+        .medal-card.unlocked { background: linear-gradient(135deg, #ffd700 0%, #daa520 100%); color: #000; border-color: #fff; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); transform: scale(1.02); z-index: 5; }
+        .medal-icon { font-size: 40px; margin-bottom: 10px; filter: grayscale(100%); opacity: 0.3; }
+        .medal-card.unlocked .medal-icon { filter: grayscale(0%); opacity: 1; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+        /* === TOAST NOTIFICATIONS === */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: rgba(10, 15, 20, 0.95); border-left: 4px solid #00a8ff; color: #fff; padding: 15px 20px; width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-family: 'Courier New', Courier, monospace; font-size: 13px; animation: slide-in 0.4s ease-out forwards; pointer-events: auto; }
+        .toast.rival { border-left-color: #f1c40f; }
+        .toast.boss { border-left-color: #2ecc71; }
+        .toast-title { font-weight: bold; margin-bottom: 5px; color: #00a8ff; }
+        .toast.rival .toast-title { color: #f1c40f; }
+        .toast.boss .toast-title { color: #2ecc71; }
+        @keyframes slide-in { 0% { transform: translateX(120%); } 100% { transform: translateX(0); } }
+        @keyframes slide-out { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(120%); opacity: 0; } }
+
+        /* === ACHIEVEMENT MODAL === */
+        #achievement-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-content { background: #111; border: 2px solid #ffd700; padding: 40px; text-align: center; max-width: 500px; box-shadow: 0 0 40px rgba(255, 215, 0, 0.3); animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop-in { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* === TEXT CONTROL UI === */
+        .text-mode { background: #f4f5f7; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .text-mode::before, .text-mode .scanline { display: none; }
+        .text-card { max-width: 700px; margin: 40px auto; background: white; padding: 40px; border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .text-btn { background: #ecf0f1; border: 1px solid #bdc3c7; padding: 14px 24px; font-size: 15px; margin-right: 12px; color: #2c3e50; border-radius: 4px; font-weight: bold; }
+        .text-btn:hover { background: #bdc3c7; }
+    </style>
+</head>
+<body>
+
+    <div id="global-scanline" class="scanline hidden"></div>
+    <div id="toast-container"></div>
+
+    <div id="screen-start" class="portal-container">
+        <h1 style="font-family: 'Arial Black', sans-serif; font-size: 58px; color: #fff; text-shadow: 0 0 20px #00a8ff; margin: 0;">INFOCHECK</h1>
+        <p style="color: #00a8ff; letter-spacing: 6px; font-size: 13px; font-weight: bold; margin-bottom: 50px;">THREAT INTELLIGENCE PLATFORM</p>
+        
+        <button class="portal-btn" onclick="initSystem('game')">START AGENT SHIFT (LIVE SIMULATION)</button>
+        <button class="portal-btn secondary" onclick="initSystem('text')">ACCESS TRAINING MANUAL (TEXT CONTROL)</button>
+    </div>
+
+    <div id="achievement-modal" class="hidden">
+        <div class="modal-content">
+            <div style="font-size: 60px; margin-bottom: 10px;" id="modal-icon">🏆</div>
+            <h2 style="color: #ffd700; margin-top: 0; font-family: 'Arial Black', sans-serif; text-transform: uppercase;">ACHIEVEMENT UNLOCKED</h2>
+            <h3 style="color: #fff;" id="modal-title"></h3>
+            <p style="color: #aaa; margin-bottom: 30px;" id="modal-desc"></p>
+            <button class="btn-action" style="background: #ffd700; color: #000;" onclick="closeModal()">CONTINUE SHIFT</button>
+        </div>
+    </div>
+
+    <div id="system-nav" class="system-nav hidden">
+        <button class="nav-btn active" onclick="switchView('dashboard')">💻 DASHBOARD</button>
+        <button class="nav-btn" onclick="switchView('inbox')">📧 INBOX <span id="inbox-notif" class="notification-dot"></span></button>
+        <button class="nav-btn" onclick="switchView('medals')">🎖️ SERVICE RECORD</button>
+        <button class="nav-btn" onclick="switchView('leaderboard')">📊 DIVISION RANKINGS</button>
+        <button class="nav-btn" style="color: #c0392b;" onclick="location.reload()">🛑 LOGOUT</button>
+    </div>
+
+    <div id="main-views" class="hidden">
+        
+        <div id="view-dashboard" class="app-container view-section">
+            <div class="stats-bar">
+                <div style="font-weight: bold; color: #00a8ff;">AGENT: <span id="display-agent-id" style="color:#fff;"></span></div>
+                <div style="display: flex; align-items: center;">
+                    <span style="letter-spacing: 1px; color: #888;">REP:</span>
+                    <div class="rep-bar-container"><div id="rep-fill" class="rep-bar-fill" style="width: 50%;"></div></div>
+                    <span id="rep-text" style="color: #2ecc71; font-weight: bold; width: 40px; text-align: right;">50%</span>
+                </div>
+            </div>
+
+            <div id="stage-briefing" class="terminal-box" style="border-left: 4px solid #f1c40f;">
+                <div class="header-bar"><span>SYSTEM DIRECTIVE</span></div>
+                <div class="content-pad" style="line-height: 1.6; color: #ccc;">
+                    <h2 style="color: #fff; margin-top: 0;">DIRECTOR'S NOTE</h2>
+                    <p>Listen up. A Senior Analyst position just opened up. You and <strong>Agent Sterling [STR-88]</strong> are the top candidates, but only one of you gets the promotion.</p>
+                    <p>Sterling is cocky, but he's fast. I don't care about tenure; I care about accuracy. Stop the fake news, verify your sources, and keep your Reputation Score above his on the Leaderboard.</p>
+                    <button class="btn-action" style="background: #00a8ff; color: #000; margin-top: 15px;" onclick="loadDay()">ACKNOWLEDGE & START WORKING</button>
+                </div>
+            </div>
+
+            <div id="stage-alert" class="terminal-box hidden" style="border-left: 4px solid #c0392b;">
+                <div class="header-bar" style="background: #3a0d0d;"><span>EMERGENCY ALERT</span></div>
+                <div class="content-pad">
+                    <p style="color: #c0392b; font-weight: bold; margin-top: 0;" id="alert-context"></p>
+                    <div class="social-card" id="alert-content"></div>
+                    <button class="btn-action" style="background: #222; margin-top: 20px; border: 1px solid #555;" onclick="openInvestigation()">BEGIN INVESTIGATION -></button>
+                </div>
+            </div>
+
+            <div id="stage-investigate" class="terminal-box hidden" style="border-left: 4px solid #00a8ff;">
+                <div class="header-bar"><span>DATABASE SEARCH</span></div>
+                <div class="content-pad">
+                    <div id="evidence-list"></div>
+                    <div id="active-evidence"></div>
+                    <button id="btn-to-verdict" class="btn-action hidden" style="background: #c0392b; margin-top: 20px;" onclick="showVerdict()">PROCEED TO VERDICT</button>
+                </div>
+            </div>
+
+            <div id="stage-verdict" class="terminal-box hidden" style="border-left: 4px solid #f1c40f;">
+                <div class="header-bar" style="background: #2a240a;"><span>VERDICT REQUIRED</span></div>
+                <div class="content-pad" style="text-align: center;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" id="verdict-buttons"></div>
+                </div>
+            </div>
+
+            <div id="stage-feedback" class="terminal-box hidden" style="border-left: 4px solid #2ecc71;">
+                <div class="header-bar"><span>SYSTEM FEEDBACK</span></div>
+                <div class="content-pad">
+                    <h2 id="feedback-title" style="margin-top: 0;"></h2>
+                    <p id="feedback-text" style="color: #ccc; line-height: 1.5;"></p>
+                    <button class="btn-action" style="background: #00a8ff; color: #000; margin-top: 20px;" onclick="nextDay()">PROCESS NEXT ALERT</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-inbox" class="app-container view-section hidden">
+            <h2 style="border-bottom: 1px solid #333; padding-bottom: 10px; color: #00a8ff;">SECURE INBOX</h2>
+            <div id="email-list"></div>
+        </div>
+
+        <div id="view-leaderboard" class="app-container view-section hidden">
+            <h2 style="border-bottom: 1px solid #333; padding-bottom: 10px; color: #00a8ff;">DIVISION RANKINGS</h2>
+            <p style="color: #888; font-size: 14px;">Rankings update dynamically. Secure the top spot for the Senior Analyst promotion.</p>
+            <div class="terminal-box">
+                <div class="header-bar"><span>RANK</span><span>AGENT ID</span><span>REPUTATION</span></div>
+                <div id="lb-content"></div>
+            </div>
+        </div>
+
+        <div id="view-medals" class="app-container view-section hidden">
+            <h2 style="border-bottom: 1px solid #333; padding-bottom: 10px; color: #ffd700;">SERVICE RECORD</h2>
+            <div class="medal-grid" id="medal-container"></div>
+        </div>
+    </div>
+
+    <div id="text-ui" class="hidden">
+        <div class="text-card">
+            <div style="font-size: 24px; font-weight: bold; border-bottom: 2px solid #eaeaea; padding-bottom: 15px; margin-bottom: 25px; color: #2c3e50;" id="text-header-title"></div>
+            <div style="background: #f8f9fa; border-left: 4px solid #3b5998; padding: 25px; margin-bottom: 30px;" id="text-lesson"></div>
+            
+            <h3 style="color: #2c3e50; font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Scenario Review</h3>
+            <div id="text-case-content" style="line-height: 1.8; color: #444; font-size: 16px; margin-top: 20px;"></div>
+            
+            <div style="margin-top: 50px; background: #fdfdfd; border: 1px solid #eaeaea; padding: 30px; border-radius: 4px;">
+                <p style="font-weight: bold; color: #2c3e50; margin-top: 0; margin-bottom: 20px; font-size: 18px;">How would you handle this information?</p>
+                <button class="text-btn" onclick="nextDay()">Amplify / Share Information</button>
+                <button class="text-btn" style="background: #2c3e50; color: #fff; border-color: #2c3e50;" onclick="nextDay()">Flag / Verify Further</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-end" class="app-container hidden" style="text-align: center; padding-top: 10vh;">
+        <h1 style="color: #2ecc71; font-size: 48px;">EVALUATION COMPLETE</h1>
+        <h2 id="final-result-text" style="margin-bottom: 30px;"></h2>
+        <button class="btn-action" style="background: #00a8ff; color: #000; width: 300px;" onclick="location.reload()">RETURN TO HUB</button>
+    </div>
+
+    <script>
+        // === 6 FULL SCENARIOS & MEDALS ===
+        const cases = [
+            {
+                id: "CASE-01", context: "Water Supply Panic", medal: "debunker",
+                post: "🚨 <strong>DO NOT DRINK THE TAP WATER!!</strong> 🚨<br><br>My neighbor just passed out after one glass. The city is hiding a massive chemical spill!",
+                evidence: [
+                    { name: "Utility Sensor Grid", content: "PH Levels: Normal. Contaminants: 0.00%. All sensors GREEN." },
+                    { name: "Hospital Logs", content: "RESULT: 0 Admissions for chemical poisoning." }
+                ],
+                verdicts: [
+                    { label: "Share Alert", isCorrect: false, rep: -20, fTitle: "❌ PANIC TRIGGERED", fText: "You amplified a rumor. The neighbor collapsed from heat exhaustion." },
+                    { label: "Flag as Fake", isCorrect: true, rep: +15, fTitle: "✅ THREAT NEUTRALIZED", fText: "Good work. You verified the claim against independent sources." }
+                ],
+                textLesson: "<strong>Principle of Corroboration:</strong> A single loud voice, even if viral, is not evidence. Cross-reference extreme claims with independent data.",
+                textStory: "A local account claimed the tap water was lethal because a neighbor collapsed. However, independent city water sensors showed normal purity levels, and hospital logs showed zero poisonings. The neighbor had simply fainted from heat exhaustion."
+            },
+            {
+                id: "CASE-02", context: "Tech Infrastructure Threat", medal: "tech",
+                post: "Hundreds of birds just dropped dead around the new 5G tower on Main St! The radiation is frying them mid-air! 🐦☢️",
+                evidence: [
+                    { name: "Avian Autopsy Report", content: "CAUSE OF DEATH: Blunt force trauma. Flock collided with new glass office building." },
+                    { name: "Telecom Status", content: "TOWER 88: Power Status is OFFLINE. Scheduled Activation: Next month." }
+                ],
+                verdicts: [
+                    { label: "Issue Warning", isCorrect: false, rep: -15, fTitle: "❌ FALSE CORRELATION", fText: "You confused correlation with causation. The tower wasn't even turned on." },
+                    { label: "Block Rumor", isCorrect: true, rep: +15, fTitle: "✅ MISINFO STOPPED", fText: "Solid analysis. You checked the actual power status of the tower." }
+                ],
+                textLesson: "<strong>Correlation vs. Causation:</strong> Just because two things exist near each other does not mean one caused the other.",
+                textStory: "A viral post blamed a new 5G tower for dead birds. An investigation revealed the tower hadn't been powered on yet. The birds died from flying into a glass skyscraper next to the tower."
+            },
+            {
+                id: "CASE-03", context: "Financial Embezzlement", medal: "fraud",
+                post: "While we struggle, Director Vance of City Hope Charity just dropped €120k cash on a new Porsche. Where did that money come from? #CityHopeScam",
+                evidence: [
+                    { name: "City Hope Bank Logs", content: "TRANSACTION: CASH WITHDRAWAL. AMOUNT: -€120,000. FLAG: Matches car purchase exactly." },
+                    { name: "Vance Tax Return", content: "REPORTED INCOME: €45,000/yr. No recent inheritance or loans." }
+                ],
+                verdicts: [
+                    { label: "Ignore (Gossip)", isCorrect: false, rep: -20, fTitle: "❌ CORRUPTION MISSED", fText: "You dismissed this, but the converging bank logs proved a crime." },
+                    { label: "Escalate to Fraud", isCorrect: true, rep: +20, fTitle: "✅ FRAUD DETECTED", fText: "Excellent. The converging evidence confirmed the embezzlement." }
+                ],
+                textLesson: "<strong>Converging Evidence:</strong> A photo isn't proof. But when multiple independent documents align with it, a factual pattern emerges.",
+                textStory: "Rumors claimed a charity director stole funds based on a photo at a dealership. An audit of the charity's bank logs revealed a matching €120,000 cash withdrawal the exact same day, confirming the fraud."
+            },
+            {
+                id: "CASE-04", context: "Digital Manipulation (Deepfake)", medal: "forensics",
+                post: "BREAKING AUDIO: The Mayor caught on a hot mic saying, 'We are going to rig the ballots so we never lose again.' Listen here! 🎙️",
+                evidence: [
+                    { name: "Audio Forensics", content: "Unnatural pitch shifts detected. 98% probability of AI Voice Cloning." },
+                    { name: "Mayor's Schedule", content: "The Mayor was giving a live, televised speech at the time of the alleged recording." }
+                ],
+                verdicts: [
+                    { label: "Amplify Scandal", isCorrect: false, rep: -25, fTitle: "❌ DEEPFAKE SPREAD", fText: "You fell for a synthetic audio deepfake." },
+                    { label: "Flag as Deepfake", isCorrect: true, rep: +20, fTitle: "✅ DEEPFAKE BLOCKED", fText: "Great catch using forensic tools." }
+                ],
+                textLesson: "<strong>Synthetic Media:</strong> Look for contextual inconsistencies (alibis) and unnatural digital artifacts.",
+                textStory: "A shocking audio clip was released. Forensic analysis showed artifacts consistent with AI generation. Furthermore, the politician was giving a live speech on television at that exact time."
+            },
+            {
+                id: "CASE-05", context: "Sensationalist Doomsday", medal: "cosmic",
+                post: "NASA confirms ASTEROID APOPHIS will strike Earth next Tuesday! The government is hiding it! ☄️🌍",
+                evidence: [
+                    { name: "NASA Database", content: "DISTANCE: 19,800 miles (safe distance). IMPACT RISK: 0.00%." },
+                    { name: "Astronomy Journal", content: "Apophis will safely pass Earth. No threat to life." }
+                ],
+                verdicts: [
+                    { label: "Sound Alarm", isCorrect: false, rep: -15, fTitle: "❌ FELL FOR CLICKBAIT", fText: "You let sensationalism override science. The asteroid is passing safely." },
+                    { label: "Debunk Claim", isCorrect: true, rep: +10, fTitle: "✅ CONTEXT RESTORED", fText: "Hoaxers often take a seed of truth and strip the context. You checked the data." }
+                ],
+                textLesson: "<strong>Context Dropping:</strong> Misinformation often uses a real fact but strips away vital context to generate fear.",
+                textStory: "A post claimed an asteroid would strike Earth. The NASA database confirmed the asteroid was real, but passing at a safe distance of 20,000 miles."
+            },
+            {
+                id: "CASE-06", context: "Cyber Security Threat", medal: "cyber",
+                post: "<strong>URGENT ADMIN MESSAGE:</strong><br>Your InfoCheck account is flagged. Click here to verify credentials or lose access: http://www.lnfocheck-security.com",
+                evidence: [
+                    { name: "Link Inspector", content: "WARNING: Domain uses a lowercase 'L' instead of 'I' (lnfocheck). Registered 3 hours ago." },
+                    { name: "IT Protocols", content: "Admin will NEVER ask for credential verification via external links." }
+                ],
+                verdicts: [
+                    { label: "Click to Verify", isCorrect: false, rep: -30, fTitle: "❌ COMPROMISED", fText: "You fell for a phishing scam." },
+                    { label: "Report Phishing", isCorrect: true, rep: +20, fTitle: "✅ SYSTEM SECURED", fText: "Outstanding. You spotted the fake URL." }
+                ],
+                textLesson: "<strong>Urgency & Phishing:</strong> Scammers create a false sense of urgency to force you to act without thinking.",
+                textStory: "An employee received an email claiming their account would be deleted. By inspecting the link, they realized the company name was subtly misspelled."
+            }
+        ];
+
+        const medalDefs = {
+            debunker: { icon: "🛡️", title: "Epidemic Expert", desc: "Debunked a public health panic." },
+            tech: { icon: "📡", title: "Tech Sentinel", desc: "Identified false environmental correlations." },
+            fraud: { icon: "💼", title: "Follow the Money", desc: "Detected financial embezzlement via converging data." },
+            forensics: { icon: "👁️‍🗨️", title: "Deepfake Destroyer", desc: "Successfully identified synthetic media." },
+            cosmic: { icon: "☄️", title: "Cosmic Calmer", desc: "Debunked sensationalized scientific claims." },
+            cyber: { icon: "🔐", title: "Firewall Guardian", desc: "Thwarted an internal phishing attack." }
+        };
+
+        // === STATE ===
+        let agentID = "";
+        let sysMode = "";
+        let rep = 50;
+        let currentDay = 0;
+        let emails = [];
+        let unlockedMedals = [];
+        let sterlingRep = 60; // Rival starts ahead
+
+        // === INIT ===
+        function initSystem(mode) {
+            sysMode = mode;
+            document.getElementById('screen-start').classList.add('hidden');
+            
+            if (sysMode === 'game') {
+                agentID = "AG-" + Math.floor(1000 + Math.random() * 9000);
+                document.getElementById('display-agent-id').innerText = agentID;
+                document.getElementById('system-nav').classList.remove('hidden');
+                document.getElementById('main-views').classList.remove('hidden');
+                document.getElementById('global-scanline').classList.remove('hidden');
+                
+                initLeaderboard();
+                renderMedals();
+            } else {
+                document.body.className = 'text-mode';
+                document.getElementById('text-ui').classList.remove('hidden');
+                loadDay();
+            }
+        }
+
+        // === VIEW NAVIGATION ===
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-' + viewId).classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            if(viewId === 'inbox') {
+                document.getElementById('inbox-notif').style.display = 'none';
+                renderEmails();
+            } else if (viewId === 'leaderboard') {
+                updateLeaderboard();
+            }
+        }
+
+        // === GAME LOGIC ===
+        function loadDay() {
+            if (currentDay >= cases.length) { endGame(); return; }
+            
+            if (sysMode === 'game') {
+                document.getElementById('stage-briefing').classList.add('hidden');
+                document.getElementById('stage-alert').classList.remove('hidden');
+                document.getElementById('stage-investigate').classList.add('hidden');
+                document.getElementById('stage-verdict').classList.add('hidden');
+                document.getElementById('stage-feedback').classList.add('hidden');
+
+                const data = cases[currentDay];
+                document.getElementById('alert-context').innerText = `FILE #${currentDay+1}: ` + data.context;
+                document.getElementById('alert-content').innerHTML = data.post;
+            } else {
+                const data = cases[currentDay];
+                document.getElementById('text-header-title').innerText = "Training Module: Scenario " + (currentDay + 1);
+                document.getElementById('text-lesson').innerHTML = "<h4 style='margin-top:0; color:#3b5998;'>Core Concept</h4>" + data.textLesson;
+                document.getElementById('text-case-content').innerHTML = data.textStory;
+                window.scrollTo(0,0);
+            }
+        }
+
+        function openInvestigation() {
+            document.getElementById('stage-investigate').classList.remove('hidden');
+            const data = cases[currentDay];
+            const evList = document.getElementById('evidence-list');
+            evList.innerHTML = '';
+            document.getElementById('active-evidence').innerHTML = '';
+            document.getElementById('btn-to-verdict').classList.add('hidden');
+
+            data.evidence.forEach((ev, idx) => {
+                evList.innerHTML += `<button class="evidence-btn" id="ev-btn-${idx}" onclick="decryptFile(${idx})"><span>[LOCKED] ${ev.name}</span><span style="color:#00a8ff; font-size:12px;">DECRYPT</span></button>`;
+            });
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        function decryptFile(idx) {
+            const btn = document.getElementById(`ev-btn-${idx}`);
+            if (btn.classList.contains('viewed')) return;
+            btn.classList.add('viewed');
+            btn.innerHTML = `<span><span style="color:#2ecc71;">[OPEN]</span> ${cases[currentDay].evidence[idx].name}</span><span style="color:#2ecc71; font-size:12px;">GRANTED</span>`;
+            
+            const folder = document.createElement('div');
+            folder.style = "background: #eaeaea; color: #222; padding: 20px; margin-top: 15px; font-family: monospace; border: 1px solid #ccc;";
+            folder.innerHTML = `<strong style="color:#00a8ff;">FILE: ${cases[currentDay].evidence[idx].name}</strong><br><br><div id="dec-${idx}" class="decoding-text"></div>`;
+            document.getElementById('active-evidence').appendChild(folder);
+            
+            const decodeBox = document.getElementById(`dec-${idx}`);
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$";
+            let it = 0;
+            const interval = setInterval(() => {
+                let str = "";
+                for(let i=0; i<50; i++) str += chars[Math.floor(Math.random() * chars.length)];
+                decodeBox.innerText = str;
+                it++;
+                if(it > 12) { clearInterval(interval); decodeBox.classList.remove('decoding-text'); decodeBox.innerHTML = cases[currentDay].evidence[idx].content; checkAll(); }
+            }, 50);
+        }
+
+        function checkAll() {
+            if(document.querySelectorAll('.evidence-btn.viewed').length === cases[currentDay].evidence.length) {
+                document.getElementById('btn-to-verdict').classList.remove('hidden');
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }
+        }
+
+        function showVerdict() {
+            document.getElementById('stage-verdict').classList.remove('hidden');
+            const vGrid = document.getElementById('verdict-buttons');
+            vGrid.innerHTML = '';
+            cases[currentDay].verdicts.forEach((v, idx) => {
+                const color = v.rep > 0 ? '#27ae60' : '#c0392b';
+                vGrid.innerHTML += `<button class="btn-action" style="background: ${color};" onclick="submitDecision(${idx})">${v.label}</button>`;
+            });
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        function submitDecision(idx) {
+            const v = cases[currentDay].verdicts[idx];
+            document.getElementById('stage-verdict').classList.add('hidden');
+            document.getElementById('stage-feedback').classList.remove('hidden');
+            
+            // Rep changes
+            rep = Math.max(0, Math.min(100, rep + v.rep));
+            document.getElementById('rep-fill').style.width = rep + '%';
+            document.getElementById('rep-text').innerText = rep + '%';
+
+            // === RIVALRY LOGIC ===
+            if (v.isCorrect) {
+                sterlingRep += 2; // Rival grows slowly
+                
+                // Unlock Medal & Modal
+                const medalKey = cases[currentDay].medal;
+                unlockedMedals.push(medalKey);
+                showModal(medalDefs[medalKey]);
+                
+                // Bitter toast from Sterling
+                if(currentDay === 1) {
+                    setTimeout(() => showToast("Message from STR-88", "Beginner's luck. Don't let it go to your head.", "rival"), 2000);
+                }
+                if(currentDay === 3) {
+                    setTimeout(() => sendEmail("Director Hayes", "Office News: Solid Work", `Good catch on Case 4. Sterling missed a similar deepfake yesterday. Keep pushing, ${agentID}.`), 3000);
+                }
+            } else {
+                sterlingRep += 8; // Rival jumps if you fail
+                
+                // Snarky toast from Sterling
+                setTimeout(() => showToast("Message from STR-88", "Oof. Did you even read the evidence files, rookie?", "rival"), 1000);
+                
+                if(currentDay === 2 || currentDay === 4) {
+                    setTimeout(() => sendEmail("Director Hayes", "Monthly Accuracy Report", "Sterling is currently leading the division. Your recent error has been flagged. Shape up."), 3000);
+                }
+            }
+            if(sterlingRep > 100) sterlingRep = 99;
+
+            document.getElementById('feedback-title').innerText = v.fTitle;
+            document.getElementById('feedback-title').style.color = v.rep > 0 ? '#2ecc71' : '#c0392b';
+            document.getElementById('feedback-text').innerText = v.fText;
+            
+            renderMedals();
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        function nextDay() { currentDay++; loadDay(); }
+
+        // === NOTIFICATIONS (TOASTS) ===
+        function showToast(title, message, type="boss") {
+            const cont = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<div class="toast-title">${title}</div><div>${message}</div>`;
+            cont.appendChild(t);
+            
+            setTimeout(() => {
+                t.style.animation = "slide-out 0.4s forwards";
+                setTimeout(() => t.remove(), 400);
+            }, 5000);
+        }
+
+        // === EMAILS ===
+        function sendEmail(sender, subject, body) {
+            emails.unshift({ sender, subject, body, read: false });
+            document.getElementById('inbox-notif').style.display = 'block';
+            showToast("NEW EMAIL", `From: ${sender}`, "boss");
+            renderEmails();
+        }
+
+        function renderEmails() {
+            const list = document.getElementById('email-list');
+            list.innerHTML = '';
+            if(emails.length === 0) list.innerHTML = "<p style='color:#555;'>Inbox is empty.</p>";
+            emails.forEach((em, idx) => {
+                const isUnread = !em.read ? 'unread' : '';
+                list.innerHTML += `
+                    <div class="email-item ${isUnread}" onclick="openEmail(${idx})">
+                        <div>
+                            <div style="font-size: 12px; color: #888;">FROM: ${em.sender}</div>
+                            <div style="font-weight:bold; color:#fff;">${em.subject}</div>
+                        </div>
+                        <div style="font-size: 12px; color:#00a8ff;">${em.read ? 'OPENED' : 'NEW'}</div>
+                    </div>
+                    <div id="email-body-${idx}" class="email-body hidden">${em.body}</div>
+                `;
+            });
+        }
+
+        function openEmail(idx) {
+            emails[idx].read = true;
+            document.getElementById(`email-body-${idx}`).classList.toggle('hidden');
+            renderEmails();
+            if(emails.every(e => e.read)) document.getElementById('inbox-notif').style.display = 'none';
+        }
+
+        // === MEDALS & MODALS ===
+        function renderMedals() {
+            const cont = document.getElementById('medal-container');
+            cont.innerHTML = '';
+            Object.keys(medalDefs).forEach(k => {
+                const m = medalDefs[k];
+                const isUnlocked = unlockedMedals.includes(k) ? 'unlocked' : '';
+                cont.innerHTML += `
+                    <div class="medal-card ${isUnlocked}">
+                        <div class="medal-icon">${m.icon}</div>
+                        <h3 style="margin: 0 0 10px 0; font-family:'Arial Black', sans-serif;">${m.title}</h3>
+                        <p style="font-size: 13px; margin: 0;">${m.desc}</p>
+                    </div>
+                `;
+            });
+        }
+
+        function showModal(medalData) {
+            document.getElementById('modal-icon').innerText = medalData.icon;
+            document.getElementById('modal-title').innerText = medalData.title;
+            document.getElementById('modal-desc').innerText = medalData.desc;
+            document.getElementById('achievement-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('achievement-modal').classList.add('hidden');
+        }
+
+        // === LEADERBOARD (LocalStorage) ===
+        function initLeaderboard() {
+            if(!localStorage.getItem('ic_leaderboard')) {
+                const initial = [
+                    { id: "STR-88 (Sterling)", rep: 60, type: 'rival' },
+                    { id: "CHN-42", rep: 40, type: 'npc' }
+                ];
+                localStorage.setItem('ic_leaderboard', JSON.stringify(initial));
+            }
+        }
+
+        function updateLeaderboard() {
+            let board = JSON.parse(localStorage.getItem('ic_leaderboard'));
+            
+            let rival = board.find(x => x.type === 'rival');
+            if(rival) rival.rep = sterlingRep;
+
+            let player = board.find(x => x.id === agentID);
+            if(player) player.rep = rep;
+            else board.push({ id: agentID, rep: rep, type: 'player' });
+
+            board.sort((a,b) => b.rep - a.rep);
+            
+            const cont = document.getElementById('lb-content');
+            cont.innerHTML = '';
+            board.forEach((b, idx) => {
+                let medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "&nbsp;&nbsp;";
+                let rowClass = b.type === 'player' ? 'lb-row player' : b.type === 'rival' ? 'lb-row rival' : 'lb-row';
+                let name = b.type === 'player' ? `${b.id} (YOU)` : b.id;
+                
+                cont.innerHTML += `
+                    <div class="${rowClass}">
+                        <div style="width: 50px;"><span style="font-size:18px;">${medal}</span> #${idx+1}</div>
+                        <div style="flex-grow: 1; text-align: center;">${name}</div>
+                        <div style="width: 50px; text-align: right;">${b.rep}%</div>
+                    </div>
+                `;
+            });
+
+            localStorage.setItem('ic_leaderboard', JSON.stringify(board));
+        }
+
+        // === END GAME ===
+        function endGame() {
+            document.getElementById('system-nav').classList.add('hidden');
+            document.getElementById('main-views').classList.add('hidden');
+            document.getElementById('text-ui').classList.add('hidden');
+            document.getElementById('screen-end').classList.remove('hidden');
+            
+            if(sysMode === 'game') {
+                updateLeaderboard(); 
+                const resText = document.getElementById('final-result-text');
+                if (rep > sterlingRep) {
+                    resText.innerText = "PROMOTION SECURED. STERLING DEFEATED.";
+                    resText.style.color = "#2ecc71";
+                } else {
+                    resText.innerText = "PROMOTION DENIED. STERLING TOOK THE JOB.";
+                    resText.style.color = "#c0392b";
+                }
+            } else {
+                document.getElementById('final-result-text').innerText = "TRAINING MANUAL COMPLETED.";
+                document.getElementById('final-result-text').style.color = "#2c3e50";
+            }
+        }
+    </script>
+</body>
+</html>
