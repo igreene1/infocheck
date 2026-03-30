@@ -30,7 +30,7 @@ The simulation targets 6 specific misinformation vectors:
 ## 🚀 How to Play
 Because InfoCheck is engineered as a zero-dependency, single-page application (SPA), no backend server is required. 
 
-1. **Play Live:** [INSERT YOUR GITHUB PAGES LINK HERE]
+1. **Play Live:** [https://igreene1.github.io/infocheck/]
 2. **Run Locally:** Simply download `index.html` and open it in any modern web browser.
 
 ## 👨‍💻 Author
